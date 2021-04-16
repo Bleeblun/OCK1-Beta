@@ -235,6 +235,16 @@ static bool is_internal_level(struct dm_btree_info *info, struct frame *f)
 	return f->level < (info->levels - 1);
 }
 
+static void unlock_all_frames(struct del_stack *s)
+{
+	struct frame *f;
+
+	while (unprocessed_frames(s)) {
+		f = s->spine + s->top--;
+		dm_tm_unlock(s->tm, f->b);
+	}
+}
+
 int dm_btree_del(struct dm_btree_info *info, dm_block_t root)
 {
 	int r;
@@ -292,6 +302,10 @@ int dm_btree_del(struct dm_btree_info *info, dm_block_t root)
 	}
 
 out:
+	if (r) {
+		/* cleanup all frames of del_stack */
+		unlock_all_frames(s);
+	}
 	kfree(s);
 	return r;
 }
